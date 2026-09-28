@@ -1,41 +1,17 @@
-const demoTasks=[
- {id:1,name:"Morning routine",points:10,due:"09:00",frequency:"daily",proof:false,done:false},
- {id:2,name:"Exercise",points:15,due:"18:00",frequency:"daily",proof:false,done:false},
- {id:3,name:"Evening check-in",points:5,due:"21:00",frequency:"daily",proof:true,done:false}
-];
-let tasks=JSON.parse(localStorage.getItem("ob.tasks")||"null")||demoTasks;
-let points=Number(localStorage.getItem("ob.points")||0);
+const demoTasks=[{id:1,name:"Morning routine",points:10,due:"09:00",frequency:"daily",proof:false,done:false},{id:2,name:"Exercise",points:15,due:"18:00",frequency:"daily",proof:false,done:false},{id:3,name:"Evening check-in",points:5,due:"21:00",frequency:"daily",proof:true,done:false}];
+let tasks=JSON.parse(localStorage.getItem("ob.tasks")||"null")||demoTasks,points=Number(localStorage.getItem("ob.points")||0),launch=null;
 const $=id=>document.getElementById(id);
-function save(){localStorage.setItem("ob.tasks",JSON.stringify(tasks));localStorage.setItem("ob.points",String(points))}
-function render(){
- const done=tasks.filter(t=>t.done).length,total=tasks.length;
- $("pointsValue").textContent=points;$("completedCount").textContent=done;$("taskCount").textContent=total;
- $("progressBar").style.width=total?((done/total)*100)+"%":"0%";$("streakValue").textContent=done?done+" day"+(done===1?"":"s"):"0 days";
- $("rewardCount").textContent=Math.floor(points/50);
- $("taskList").innerHTML=tasks.map(t=>`<article class="task ${t.done?"done":""}">
- <input type="checkbox" ${t.done?"checked":""} data-id="${t.id}">
- <div class="task-main"><div class="task-title">${escapeHtml(t.name)}</div><div class="task-meta">Due ${t.due} · ${t.frequency} · ${t.proof?"Proof required · ":""}<span class="pill">+${t.points} pts</span></div></div></article>`).join("");
- document.querySelectorAll("#taskList input").forEach(el=>el.onchange=()=>toggle(Number(el.dataset.id)));
-}
-function toggle(id){const t=tasks.find(x=>x.id===id);if(!t)return;t.done=!t.done;points=Math.max(0,points+(t.done?t.points:-t.points));save();render();}
+const localSave=()=>{localStorage.setItem("ob.tasks",JSON.stringify(tasks));localStorage.setItem("ob.points",String(points))};
+const state=()=>({version:1,tasks,points,updatedAt:new Date().toISOString()});
+async function remoteSave(){if(!launch?.sessionId||!launch?.mainToken)return;try{await fetch("/api/state",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sessionId:launch.sessionId,mainToken:launch.mainToken,data:state()})})}catch(e){console.warn("Remote save failed",e)}}
+async function remoteLoad(){if(!launch?.sessionId||!launch?.mainToken)return false;try{const r=await fetch("/api/state?sessionId="+encodeURIComponent(launch.sessionId)+"&mainToken="+encodeURIComponent(launch.mainToken));if(!r.ok)return false;const b=await r.json(),d=b?.data||b?.state?.data;if(d?.tasks){tasks=d.tasks;points=Number(d.points||0);localSave();return true}}catch(e){console.warn("Remote load failed",e)}return false}
+function render(){const done=tasks.filter(t=>t.done).length,total=tasks.length;$( "pointsValue").textContent=points;$("completedCount").textContent=done;$("taskCount").textContent=total;$("progressBar").style.width=total?done/total*100+"%":"0%";$("streakValue").textContent=done?done+" day"+(done===1?"":"s"):"0 days";$("rewardCount").textContent=Math.floor(points/50);$("taskList").innerHTML=tasks.map(t=>`<article class="task ${t.done?"done":""}"><input type="checkbox" ${t.done?"checked":""} data-id="${t.id}"><div class="task-main"><div class="task-title">${escapeHtml(t.name)}</div><div class="task-meta">Due ${t.due} · ${t.frequency} · ${t.proof?"Proof required · ":""}<span class="pill">+${t.points} pts</span></div></div></article>`).join("");document.querySelectorAll("#taskList input").forEach(el=>el.onchange=()=>toggle(Number(el.dataset.id)))}
+async function toggle(id){const t=tasks.find(x=>x.id===id);if(!t)return;t.done=!t.done;points=Math.max(0,points+(t.done?t.points:-t.points));localSave();render();await remoteSave();if(t.done&&launch?.sessionId&&launch?.mainToken){try{await fetch("/api/task",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sessionId:launch.sessionId,mainToken:launch.mainToken,name:"task.complete",params:{successful:true}})})}catch(e){console.warn("Task completion not sent",e)}}}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
 $("dateLabel").textContent=new Intl.DateTimeFormat(undefined,{weekday:"long",month:"long",day:"numeric"}).format(new Date());
-$("addTaskBtn").onclick=()=> $("taskEditor").classList.remove("hidden");
-$("closeEditor").onclick=()=> $("taskEditor").classList.add("hidden");
-$("saveTask").onclick=()=>{
- const name=$("taskName").value.trim();if(!name)return;
- tasks.push({id:Date.now(),name,points:Number($("taskPoints").value)||0,due:$("taskDue").value||"—",frequency:$("taskFrequency").value,proof:$("taskProof").checked,done:false});
- save();render();$("taskEditor").classList.add("hidden");$("taskName").value="";
-};
-function initChastify(){
- const raw=location.hash.slice(1);if(!raw)return;
- try{
-   const data=JSON.parse(decodeURIComponent(raw));
-   $("connectionStatus").textContent="Chastify session";
-   if(data.ui?.theme) document.documentElement.dataset.theme=data.ui.theme;
-   const req={type:"chastify:ext:req",v:1,id:crypto.randomUUID(),nonce:data.bridge?.nonce,action:"session.get",payload:{}};
-   if(data.bridge?.parentOrigin) parent.postMessage(req,data.bridge.parentOrigin);
- }catch(e){console.warn("Chastify launch payload unavailable",e)}
-}
-window.addEventListener("message",e=>{if(e.data?.type==="chastify:ext:resp"&&e.data.ok){$("connectionStatus").textContent="Connected to Chastify"}});
+$("addTaskBtn").onclick=()=>$( "taskEditor").classList.remove("hidden");$("closeEditor").onclick=()=>$( "taskEditor").classList.add("hidden");
+$("saveTask").onclick=async()=>{const name=$( "taskName").value.trim();if(!name)return;const task={id:Date.now(),name,points:Number($( "taskPoints").value)||0,due:$( "taskDue").value||"—",frequency:$( "taskFrequency").value,proof:$( "taskProof").checked,done:false};tasks.push(task);localSave();render();$( "taskEditor").classList.add("hidden");$( "taskName").value="";await remoteSave();if(launch?.sessionId&&launch?.mainToken){try{await fetch("/api/task",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sessionId:launch.sessionId,mainToken:launch.mainToken,name:"task.assign",params:{taskText:task.name,points:task.points,verificationRequired:task.proof}})})}catch(e){console.warn("Task assignment not sent",e)}}};
+function bridge(action,payload={}){if(!launch?.bridge?.parentOrigin)return;parent.postMessage({type:"chastify:ext:req",v:1,id:crypto.randomUUID(),nonce:launch.bridge.nonce,action,payload},launch.bridge.parentOrigin)}
+async function initChastify(){const raw=location.hash.slice(1);if(!raw)return;try{launch=JSON.parse(decodeURIComponent(raw));$("connectionStatus").textContent="Chastify session";if(launch.ui?.theme)document.documentElement.dataset.theme=launch.ui.theme;bridge("session.get",{});if(await remoteLoad())render()}catch(e){console.warn("Launch payload unavailable",e)}}
+window.addEventListener("message",e=>{if(e.data?.type==="chastify:ext:resp"&&e.data.ok){$("connectionStatus").textContent="Connected to Chastify";if(e.data.data?.lockData?.lockTitle)$("greeting").textContent=e.data.data.lockData.lockTitle}});
 render();initChastify();
