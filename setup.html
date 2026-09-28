@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Obedience Tracker Setup</title><link rel="stylesheet" href="./styles.css"></head>
+<body>
+<main class="shell setup">
+  <div class="eyebrow">CHASTIFY EXTENSION SETUP</div>
+  <h1>Obedience Tracker</h1>
+  <p class="muted">Configure the tracker for this lock. This first version stores configuration through Chastify's setup bridge.</p>
+  <label>Daily points goal<input id="goal" type="number" min="0" value="50"></label>
+  <label class="check"><input id="proofDefault" type="checkbox"> Require proof by default</label>
+  <button class="primary" id="saveSetup">Save configuration</button>
+  <p id="setupStatus" class="muted"></p>
+</main>
+<script>
+(function(){
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const ui = { goal: document.getElementById('goal'), proof: document.getElementById('proofDefault'), status: document.getElementById('setupStatus') };
+  function send(config){ parent.postMessage({type:'chastify:ext:setup:config',config}, '*'); ui.status.textContent='Configuration sent to Chastify.'; }
+  document.getElementById('saveSetup').onclick=()=>send({dailyPointsGoal:Number(ui.goal.value)||0, requireProofByDefault:ui.proof.checked});
+  parent.postMessage({type:'chastify:ext:setup:ready',v:1}, '*');
+})();
+</script>
+</body>
+</html>
