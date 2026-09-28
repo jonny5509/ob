@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Obedience Tracker</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">CHASTIFY EXTENSION</div>
+        <h1>Obedience Tracker</h1>
+        <p id="subtitle">Habits, tasks, points and rewards</p>
+      </div>
+      <div class="status" id="connectionStatus">Demo mode</div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <div class="eyebrow">TODAY</div>
+        <h2 id="greeting">Today's requirements</h2>
+        <p id="dateLabel"></p>
+      </div>
+      <div class="points">
+        <strong id="pointsValue">0</strong>
+        <span>points</span>
+      </div>
+    </section>
+
+    <section class="progress-card">
+      <div class="progress-head">
+        <span>Daily progress</span>
+        <strong><span id="completedCount">0</span>/<span id="taskCount">0</span></strong>
+      </div>
+      <div class="progress"><div id="progressBar"></div></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h3>Tasks</h3>
+        <button class="secondary" id="addTaskBtn">+ Add task</button>
+      </div>
+      <div id="taskList" class="task-list"></div>
+    </section>
+
+    <section class="stats">
+      <div><span>Current streak</span><strong id="streakValue">0 days</strong></div>
+      <div><span>Available rewards</span><strong id="rewardCount">0</strong></div>
+    </section>
+
+    <section id="taskEditor" class="panel hidden">
+      <div class="section-head"><h3>New task</h3><button class="icon" id="closeEditor">×</button></div>
+      <label>Task name<input id="taskName" placeholder="Morning routine" /></label>
+      <div class="grid2">
+        <label>Points<input id="taskPoints" type="number" min="0" value="10" /></label>
+        <label>Due time<input id="taskDue" type="time" value="09:00" /></label>
+      </div>
+      <label>Frequency
+        <select id="taskFrequency"><option value="daily">Every day</option><option value="weekly">Weekly</option><option value="once">One time</option></select>
+      </label>
+      <label class="check"><input id="taskProof" type="checkbox" /> Proof required</label>
+      <button class="primary" id="saveTask">Create task</button>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
