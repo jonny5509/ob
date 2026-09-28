@@ -1,0 +1,9 @@
+{
+  "name":"obedience-tracker",
+  "version":"0.1.0",
+  "private":true,
+  "description":"Obedience-style habit and task tracker for Chastify extensions",
+  "main":"server.js",
+  "scripts":{"start":"node server.js","dev":"node server.js"},
+  "engines":{"node":">=20"}
+}
