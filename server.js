@@ -9,13 +9,35 @@ async function api({sessionId,mainToken,method="GET",route,data}){
  const r=await fetch("https://chastify.net/api/extensions/sessions/"+encodeURIComponent(sessionId)+route,{method,headers:{"Authorization":"Bearer "+KEY,"x-chastify-main-token":mainToken,...(data?{"content-type":"application/json"}:{})},body:data?JSON.stringify(data):undefined});
  const t=await r.text();let d={};try{d=t?JSON.parse(t):{}}catch{d={raw:t}};if(!r.ok)throw Object.assign(new Error(d?.error?.message||"Chastify request failed"),{status:r.status,details:d});return d;
 }
+function cleanState(d){
+ const tasks=Array.isArray(d?.tasks)?d.tasks.map(t=>({id:t.id,name:String(t.name||"").slice(0,200),points:Math.max(0,Math.min(10000,Number(t.points)||0)),due:String(t.due||"—").slice(0,20),frequency:String(t.frequency||"daily"),proof:Boolean(t.proof),done:Boolean(t.done)})).slice(0,100):[];
+ return {version:1,tasks,points:Math.max(0,Number(d?.points)||0),history:Array.isArray(d?.history)?d.history.slice(-100):[],updatedAt:new Date().toISOString()};
+}
 http.createServer(async(req,res)=>{
  try{
   const u=new URL(req.url,"http://localhost:"+PORT);
   if(req.method==="GET"&&u.pathname==="/api/health")return json(res,200,{ok:true,configured:Boolean(KEY)});
   if(u.pathname==="/api/state"&&req.method==="GET")return json(res,200,await api({sessionId:u.searchParams.get("sessionId"),mainToken:u.searchParams.get("mainToken"),route:"/state"}));
-  if(u.pathname==="/api/state"&&req.method==="POST"){const b=await readBody(req);return json(res,200,await api({sessionId:b.sessionId,mainToken:b.mainToken,method:"PATCH",route:"/state",data:{data:b.data}}))}
-  if(u.pathname==="/api/task"&&req.method==="POST"){const b=await readBody(req);if(!["task.assign","task.complete"].includes(b.name))return json(res,400,{error:"unsupported_action"});return json(res,200,await api({sessionId:b.sessionId,mainToken:b.mainToken,method:"POST",route:"/action",data:{name:b.name,params:b.params||{}}}))}
+  if(u.pathname==="/api/state"&&req.method==="POST"){const b=await readBody(req);const data=cleanState(b.data);return json(res,200,await api({sessionId:b.sessionId,mainToken:b.mainToken,method:"PATCH",route:"/state",data:{data}}))}
+  if(u.pathname==="/api/complete-habit"&&req.method==="POST"){
+   const b=await readBody(req);
+   const current=await api({sessionId:b.sessionId,mainToken:b.mainToken,route:"/state"});
+   const state=cleanState(current?.data||current?.state?.data||{});
+   const task=state.tasks.find(t=>String(t.id)===String(b.taskId));
+   if(!task)return json(res,404,{error:"task_not_found"});
+   if(task.done)return json(res,200,{ok:true,alreadyComplete:true,state});
+   task.done=true;
+   state.points+=task.points;
+   state.history.push({type:"complete",taskId:task.id,points:task.points,at:new Date().toISOString()});
+   const saved=await api({sessionId:b.sessionId,mainToken:b.mainToken,method:"PATCH",route:"/state",data:{data:state}});
+   const action=await api({sessionId:b.sessionId,mainToken:b.mainToken,method:"POST",route:"/action",data:{name:"task.complete",params:{successful:true}}});
+   return json(res,200,{ok:true,state,saved,action});
+  }
+  if(u.pathname==="/api/task"&&req.method==="POST"){
+   const b=await readBody(req);
+   if(!["task.assign","task.complete"].includes(b.name))return json(res,400,{error:"unsupported_action"});
+   return json(res,200,await api({sessionId:b.sessionId,mainToken:b.mainToken,method:"POST",route:"/action",data:{name:b.name,params:b.params||{}}}));
+  }
   if(u.pathname.startsWith("/api/"))return json(res,404,{error:"not_found"});
   const requested=u.pathname==="/"?"/index.html":u.pathname,file=path.normalize(path.join(ROOT,requested));
   if(!file.startsWith(ROOT)||!fs.existsSync(file)||fs.statSync(file).isDirectory())return json(res,404,{error:"not_found"});
